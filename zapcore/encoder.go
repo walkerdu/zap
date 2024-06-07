@@ -356,6 +356,10 @@ type EncoderConfig struct {
 	// Configures the field separator used by the console encoder. Defaults
 	// to tab.
 	ConsoleSeparator string `json:"consoleSeparator" yaml:"consoleSeparator"`
+
+	// @by walkerdu for Codev log format
+	AllowEmptyConsoleSeparator bool `json:"allowEmptyConsoleSeparator" yaml:"allowEmptyConsoleSeparator"`
+	MessageEmbedFields         bool `json:"messageEmbedFields" yaml:"messageEmbedFields"`
 }
 
 // ObjectEncoder is a strongly-typed, encoding-agnostic interface for adding a

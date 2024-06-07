@@ -39,10 +39,11 @@ var testEntry = Entry{
 
 func TestConsoleEncodeEntry(t *testing.T) {
 	tests := []struct {
-		desc     string
-		expected string
-		ent      Entry
-		fields   []Field
+		desc           string
+		expected       string
+		ent            Entry
+		fields         []Field
+		msgEmbedFields bool
 	}{
 		{
 			desc:     "info no fields",
@@ -64,6 +65,17 @@ func TestConsoleEncodeEntry(t *testing.T) {
 				Message:    "message",
 			},
 		},
+		{
+			desc:     "zero_time_omitted and message embed in fields",
+			expected: "info\tname\tmessage\t{\"key1\": \"val1\"}\n",
+			ent: Entry{
+				Level:      InfoLevel,
+				Time:       time.Time{},
+				LoggerName: "name",
+				Message:    "message",
+			},
+			fields: []Field{{Key: "key1", Type: StringType, String: "val1"}},
+		},
 	}
 
 	cfg := testEncoderConfig()
@@ -79,13 +91,50 @@ func TestConsoleEncodeEntry(t *testing.T) {
 			buf.Free()
 		})
 	}
+
+	// @by walkerdu for Codev log format
+	tests = []struct {
+		desc           string
+		expected       string
+		ent            Entry
+		fields         []Field
+		msgEmbedFields bool
+	}{
+		{
+			desc:     "zero_time_omitted and message embed in fields",
+			expected: "info\tname\t{\"key1\": \"val1\", \"msg\": \"message\"}\n",
+			ent: Entry{
+				Level:      InfoLevel,
+				Time:       time.Time{},
+				LoggerName: "name",
+				Message:    "message",
+			},
+			msgEmbedFields: true,
+			fields:         []Field{{Key: "key1", Type: StringType, String: "val1"}},
+		},
+	}
+
+	cfg = encoderTestEncoderConfig("", false, true)
+	cfg.EncodeTime = RFC3339TimeEncoder
+	enc = NewConsoleEncoder(cfg)
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			buf, err := enc.EncodeEntry(tt.ent, tt.fields)
+			if assert.NoError(t, err, "Unexpected console encoding error.") {
+				assert.Equal(t, tt.expected, buf.String(), "Incorrect encoded entry.")
+			}
+			buf.Free()
+		})
+	}
 }
 
 func TestConsoleSeparator(t *testing.T) {
 	tests := []struct {
-		desc        string
-		separator   string
-		wantConsole string
+		desc                string
+		separator           string
+		wantConsole         string
+		allowEmptySeparator bool
 	}{
 		{
 			desc:        "space console separator",
@@ -96,6 +145,12 @@ func TestConsoleSeparator(t *testing.T) {
 			desc:        "default console separator",
 			separator:   "",
 			wantConsole: "0\tinfo\tmain\tfoo.go:42\tfoo.Foo\thello\nfake-stack\n",
+		},
+		{
+			desc:                "default console separator",
+			separator:           "",
+			allowEmptySeparator: true,
+			wantConsole:         "0infomainfoo.go:42foo.Foohello\nfake-stack\n",
 		},
 		{
 			desc:        "tag console separator",
@@ -110,7 +165,7 @@ func TestConsoleSeparator(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		console := NewConsoleEncoder(encoderTestEncoderConfig(tt.separator))
+		console := NewConsoleEncoder(encoderTestEncoderConfig(tt.separator, tt.allowEmptySeparator, false))
 		t.Run(tt.desc, func(t *testing.T) {
 			entry := testEntry
 			consoleOut, err := console.EncodeEntry(entry, nil)
@@ -128,8 +183,13 @@ func TestConsoleSeparator(t *testing.T) {
 	}
 }
 
-func encoderTestEncoderConfig(separator string) EncoderConfig {
+func encoderTestEncoderConfig(separator string, allowEmptySeparator, messageEmbedFields bool) EncoderConfig {
 	testEncoder := testEncoderConfig()
 	testEncoder.ConsoleSeparator = separator
+
+	// @by walkerdu for Codev log format
+	testEncoder.AllowEmptyConsoleSeparator = allowEmptySeparator
+	testEncoder.MessageEmbedFields = messageEmbedFields
+
 	return testEncoder
 }

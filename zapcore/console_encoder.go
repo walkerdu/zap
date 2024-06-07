@@ -56,7 +56,7 @@ type consoleEncoder struct {
 // encoder configuration, it will omit any element whose key is set to the empty
 // string.
 func NewConsoleEncoder(cfg EncoderConfig) Encoder {
-	if cfg.ConsoleSeparator == "" {
+	if cfg.ConsoleSeparator == "" && !cfg.AllowEmptyConsoleSeparator {
 		// Use a default delimiter of '\t' for backwards compatibility
 		cfg.ConsoleSeparator = "\t"
 	}
@@ -110,9 +110,14 @@ func (c consoleEncoder) EncodeEntry(ent Entry, fields []Field) (*buffer.Buffer, 
 	putSliceEncoder(arr)
 
 	// Add the message itself.
-	if c.MessageKey != "" {
+	if c.MessageKey != "" && !c.MessageEmbedFields {
 		c.addSeparatorIfNecessary(line)
 		line.AppendString(ent.Message)
+	}
+
+	// @by walkerdu for Codev log format
+	if c.MessageEmbedFields {
+		fields = append(fields, Field{Key: c.MessageKey, Type: StringType, String: ent.Message})
 	}
 
 	// Add any structured context.
